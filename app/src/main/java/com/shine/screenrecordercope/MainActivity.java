@@ -15,10 +15,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
-import com.shine.screenrecordercope.sendtools.EchoClient;
 import com.tbruyelle.rxpermissions2.RxPermissions;
-
-import java.io.IOException;
 
 import io.reactivex.functions.Consumer;
 
@@ -71,12 +68,17 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(this, RecordService2.class);
         bindService(intent, connection, BIND_AUTO_CREATE);
 
-        new Threaad
-        try {
-            new EchoClient().talk();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+//        new Thread(new Runnable() {
+//            @Override
+//            public void run() {
+//                try {
+//                    new EchoClient().talk();
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//        }).start();
+
     }
 
     @Override
