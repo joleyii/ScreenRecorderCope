@@ -5,15 +5,24 @@ import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.os.Environment;
+import android.util.DisplayMetrics;
 import android.util.Log;
+
+import com.shine.screenrecordercope.sendtools.SocketOUt;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.concurrent.TimeUnit;
+
+import io.reactivex.Flowable;
+import io.reactivex.functions.Consumer;
 
 
 public class AvcEncoder {
@@ -32,7 +41,7 @@ public class AvcEncoder {
 
 
     @SuppressLint("NewApi")
-    public AvcEncoder(int width, int height, int framerate, int bitrate) {
+    public AvcEncoder(int width, int height, int framerate) {
 
         m_width = width;
         m_height = height;
@@ -120,101 +129,98 @@ public class AvcEncoder {
     }
 
     int count = 0;
-
+    int frameNumber = 0;
+    SocketOUt socketOUt;
     public void StartEncoderThread() {
-        Thread EncoderThread = new Thread(new Runnable() {
+        InputStream input = null;
+        final byte[] tempbytes = new byte[460800];
+        try {
+            int byteread = 0;
+            input = new FileInputStream("mnt/sdcard/aaa.h");
+            while ((byteread = input.read(tempbytes)) != -1) {
+                System.out.write(tempbytes, 0, byteread);
+            }
+        } catch (Exception e1) {
+            e1.printStackTrace();
+        } finally {
+            if (input != null) {
+                try {
+                    input.close();
+                } catch (IOException e1) {
 
-            @SuppressLint("NewApi")
-            @Override
-            public void run() {
-                isRuning = true;
-                byte[] input = null;
-                long pts = 0;
-                long generateIndex = 0;
-
-                while (isRuning) {
-//                    if (MainActivity.YUVQueue.size() > 0) {
-//                        Log.d("YUVQueue.size()", MainActivity.YUVQueue.size() + "");
-//                        input = MainActivity.YUVQueue.poll();
-//                        byte[] yuv420sp = new byte[m_width * m_height * 3 / 2];
-////                        NV21ToNV12(input, yuv420sp, m_width, m_height);
-//                        Log.d("yuv420sp.length ", yuv420sp.length + "");
-////                        input = yuv420sp;
-//                    }
-                    if (input != null) {
-                        try {
-                            long startMs = System.currentTimeMillis();
-                            ByteBuffer[] inputBuffers = mediaCodec.getInputBuffers();
-                            ByteBuffer[] outputBuffers = mediaCodec.getOutputBuffers();
-                            int inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);
-                            Log.d("bufferInfo.size", inputBufferIndex + "");
-                            if (inputBufferIndex >= 0) {
-                                pts = computePresentationTime(generateIndex);
-                                ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];
-                                inputBuffer.clear();
-                                inputBuffer.put(input);
-                                Log.d("input.length", input.length + "");
-                                mediaCodec.queueInputBuffer(inputBufferIndex, 0, input.length, pts, 0);
-                                generateIndex += 1;
-                            }
-
-                            MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
-                            int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
-                            while (outputBufferIndex >= 0) {
-                                //Log.i("AvcEncoder", "Get H264 Buffer Success! flag = "+bufferInfo.flags+",pts = "+bufferInfo.presentationTimeUs+"");
-                                ByteBuffer outputBuffer = outputBuffers[outputBufferIndex];
-                                Log.d("bufferInfo.size", bufferInfo.size + "");
-                                byte[] outData = new byte[bufferInfo.size];
-                                outputBuffer.get(outData);
-                                if (bufferInfo.flags == 2) {
-                                    configbyte = new byte[bufferInfo.size];
-                                    configbyte = outData;
-                                } else if (bufferInfo.flags == 1) {
-                                    byte[] keyframe = new byte[bufferInfo.size + configbyte.length];
-                                    System.arraycopy(configbyte, 0, keyframe, 0, configbyte.length);
-                                    System.arraycopy(outData, 0, keyframe, configbyte.length, outData.length);
-                                    Log.d("keyframe.length", keyframe.length + "");
-//                                    outputStream.write(keyframe, 0, keyframe.length);
-//                                    geiFile(keyframe);
-                                } else {
-                                    Log.d("outData.length", outData.length + "");
-//                                    outputStream.write(outData, 0, outData.length);
-//                                    geiFile(outData);
-                                }
-                                mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
-                                outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
-                            }
-
-                        } catch (Throwable t) {
-                            t.printStackTrace();
-                        }
-                    } else {
-                        try {
-                            Thread.sleep(500);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
                 }
             }
-        });
-        EncoderThread.start();
+        }
 
-    }
+        Flowable
+                .interval(45, TimeUnit.MILLISECONDS)
+                .subscribe(new Consumer<Long>() {
+                    @Override
+                    public void accept(Long aLong) throws Exception {
+                        isRuning = true;
+                        byte[] input = null;
+                        long pts = 0;
+                        long generateIndex = 0;
+                        if (input != null) {
+                            try {
+                                long startMs = System.currentTimeMillis();
+                                ByteBuffer[] inputBuffers = mediaCodec.getInputBuffers();
+                                ByteBuffer[] outputBuffers = mediaCodec.getOutputBuffers();
+                                int inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);
+                                Log.d("bufferInfo.size", inputBufferIndex + "");
+                                if (inputBufferIndex >= 0) {
+                                    pts = computePresentationTime(generateIndex);
+                                    ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];
+                                    inputBuffer.clear();
+                                    inputBuffer.put(input);
+                                    Log.d("input.length", input.length + "");
+                                    mediaCodec.queueInputBuffer(inputBufferIndex, 0, input.length, pts, 0);
+                                    generateIndex += 1;
+                                }
 
-    private void NV21ToNV12(byte[] nv21, byte[] nv12, int width, int height) {
-        if (nv21 == null || nv12 == null) return;
-        int framesize = width * height;
-        int i = 0, j = 0;
-        for (i = 0; i < framesize; i++) {
-            nv12[i] = nv21[i];
-        }
-        for (j = 0; j < framesize / 2; j += 2) {
-            nv12[framesize + j - 1] = nv21[j + framesize];
-        }
-        for (j = 0; j < framesize / 2; j += 2) {
-            nv12[framesize + j] = nv21[j + framesize - 1];
-        }
+                                MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+                                int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
+                                while (outputBufferIndex >= 0) {
+                                    //Log.i("AvcEncoder", "Get H264 Buffer Success! flag = "+bufferInfo.flags+",pts = "+bufferInfo.presentationTimeUs+"");
+                                    ByteBuffer outputBuffer = outputBuffers[outputBufferIndex];
+                                    Log.d("bufferInfo.size", bufferInfo.size + "");
+                                    byte[] outData = new byte[bufferInfo.size];
+                                    outputBuffer.get(outData);
+                                    frameNumber += 1;
+                                    if (bufferInfo.flags == 2) {
+                                        configbyte = new byte[bufferInfo.size];
+                                        configbyte = outData;
+                                    } else if (bufferInfo.flags == 1) {
+                                        byte[] keyframe = new byte[bufferInfo.size + configbyte.length];
+                                        System.arraycopy(configbyte, 0, keyframe, 0, configbyte.length);
+                                        System.arraycopy(outData, 0, keyframe, configbyte.length, outData.length);
+                                        Log.d("keyframe.length", keyframe.length + "");
+                                        socketOUt.sendData(outData, frameNumber, false);
+//                                    outputStream.write(keyframe, 0, keyframe.length);
+//                                    geiFile(keyframe);
+                                    } else {
+                                        Log.d("outData.length", outData.length + "");
+//                                    outputStream.write(outData, 0, outData.length);
+                                        socketOUt.sendData(outData, frameNumber, false);
+                                    }
+                                    mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
+                                    outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
+                                }
+
+                            } catch (Throwable t) {
+                                t.printStackTrace();
+                            }
+                        } else {
+                            try {
+                                Thread.sleep(500);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                });
+
+
     }
 
     /**
@@ -231,4 +237,5 @@ public class AvcEncoder {
 
         return retStrFormatNowDate;
     }
+
 }

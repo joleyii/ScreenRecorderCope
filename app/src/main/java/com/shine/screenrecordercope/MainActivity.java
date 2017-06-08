@@ -9,6 +9,7 @@ import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.StrictMode;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -35,6 +36,11 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
         setContentView(R.layout.activity_main);
+        if (android.os.Build.VERSION.SDK_INT > 9) {
+            StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder()
+                    .permitAll().build();
+            StrictMode.setThreadPolicy(policy);
+        }
         RxPermissions rxPermissions = new RxPermissions(this);
         rxPermissions
                 .request(Manifest.permission.WRITE_EXTERNAL_STORAGE
@@ -67,18 +73,8 @@ public class MainActivity extends AppCompatActivity {
         });
         Intent intent = new Intent(this, RecordService2.class);
         bindService(intent, connection, BIND_AUTO_CREATE);
-
-//        new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//                try {
-//                    new EchoClient().talk();
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        }).start();
-
+        Intent captureIntent = projectionManager.createScreenCaptureIntent();
+        startActivityForResult(captureIntent, RECORD_REQUEST_CODE);
     }
 
     @Override
@@ -114,7 +110,7 @@ public class MainActivity extends AppCompatActivity {
             getWindowManager().getDefaultDisplay().getMetrics(metrics);
             RecordService2.RecordBinder binder = (RecordService2.RecordBinder) service;
             recordService = binder.getRecordService();
-            Log.d("", "");
+            Log.d("onServiceConcted", "onServiceConnected");
             recordService.setHW();
             startBtn.setEnabled(true);
             startBtn.setText(recordService.isRunning() ? R.string.stop_record : R.string.start_record);

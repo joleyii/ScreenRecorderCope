@@ -38,7 +38,7 @@
 //
 ///**
 // * @author Yrom
-// * Modified by raomengyang 2017-03-12
+// *         Modified by raomengyang 2017-03-12
 // */
 //public class ScreenRecorder extends Thread {
 //    private static final String TAG = "ScreenRecorder";

@@ -3,7 +3,10 @@ package com.shine.screenrecordercope.sendtools;
 import android.util.Log;
 
 import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ExecutorService;
@@ -12,14 +15,14 @@ import java.util.concurrent.ExecutorService;
  * Created by 123 on 2017/5/12.
  */
 
-public class SocketOUt {
+public class SocketOuthhh {
     ServerSocket serverSocket = null;
-    BufferedOutputStream outputStream;
+    OutputStream outputStream;
     Socket socket;
 
     private ExecutorService mExecutorService = null;
 
-    public SocketOUt() throws IOException {
+    public SocketOuthhh() throws IOException {
         try {
             serverSocket = new ServerSocket(9988);
             new Thread(new Runnable() {
@@ -27,13 +30,11 @@ public class SocketOUt {
                 public void run() {
                     while (true) {
                         try {
-
                             socket = serverSocket.accept();
-                            Log.d("socket", "New aonnection accepted"
+                            Log.d("socketsocketsocket", "New aonnection accepted"
                                     + socket.getInetAddress() + ":"
                                     + socket.getPort());
-                            outputStream = new BufferedOutputStream(socket.getOutputStream());
-
+                            outputStream = socket.getOutputStream();
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
@@ -63,6 +64,7 @@ public class SocketOUt {
                         boolean isLast = i == count - 1;
                         addHeaderMore(sendArray, frameLenth, frameNumber, (short) i, isLast, isKeyFrame, contentArray.length);
                         System.arraycopy(contentArray, 0, sendArray, 20, contentArray.length);
+                        writeToSdcard(sendArray, frameNumber, i);
                         outputStream.write(sendArray, 0, sendArray.length);
                         outputStream.flush();
                     } catch (IOException e) {
@@ -78,6 +80,7 @@ public class SocketOUt {
                         boolean isLast = i == count - 1;
                         addHeaderMore(sendArray, frameLenth, frameNumber, (short) i, isLast, isKeyFrame, contentArray.length);
                         System.arraycopy(contentArray, 0, sendArray, 20, contentArray.length);
+                        writeToSdcard(sendArray, frameNumber, i);
                         outputStream.write(sendArray, 0, sendArray.length);
 
                         outputStream.flush();
@@ -89,48 +92,6 @@ public class SocketOUt {
             }
         }
     }
-
-    public void addHeader(byte[] b, int frameLenth, int frameNumber, short siliceNumber, boolean isLast, boolean isKeyFrame) {
-        Log.d("addHeader", frameLenth + ";;"
-                + ";frameNumber;" + frameNumber
-                + ";siliceNumber;" + siliceNumber
-                + ";isLast;" + isLast
-                + ";isKeyFrame;" + isKeyFrame
-        );
-        b[0] = 'V';
-        b[1] = '2';
-        b[2] = '0';
-
-        byte[] framLenthArray = intToBytes(frameLenth);
-        b[4] = framLenthArray[0];
-        b[5] = framLenthArray[1];
-        b[6] = framLenthArray[2];
-        b[7] = framLenthArray[3];
-
-        byte[] lenthNumberArray = intToBytes(frameNumber);
-        b[8] = lenthNumberArray[0];
-        b[9] = lenthNumberArray[1];
-        b[10] = lenthNumberArray[2];
-        b[11] = lenthNumberArray[3];
-
-        byte[] siliceNumberArray = shortToBytes(siliceNumber);
-        b[12] = siliceNumberArray[0];
-        b[13] = siliceNumberArray[1];
-
-        if (isLast) {
-            b[14] = '1';
-        } else {
-            b[14] = '0';
-        }
-        if (isKeyFrame) {
-            b[15] = '1';
-        } else {
-            b[15] = '0';
-        }
-
-    }
-
-    int i = 0;
 
     public void addHeaderMore(byte[] b, int frameLenth, int frameNumber, short siliceNumber, boolean isLast, boolean isKeyFrame, int contentArraylength) {
         Log.d("addHeader", frameLenth + ";;"
@@ -239,5 +200,73 @@ public class SocketOUt {
         }
     }
 
+    public void addHeader(byte[] b, int frameLenth, int frameNumber, short siliceNumber, boolean isLast, boolean isKeyFrame) {
+        Log.d("addHeader", frameLenth + ";;"
+                + ";frameNumber;" + frameNumber
+                + ";siliceNumber;" + siliceNumber
+                + ";isLast;" + isLast
+                + ";isKeyFrame;" + isKeyFrame
+        );
+        b[0] = 'V';
+        b[1] = '2';
+        b[2] = '0';
 
+        byte[] framLenthArray = intToBytes(frameLenth);
+        b[4] = framLenthArray[0];
+        b[5] = framLenthArray[1];
+        b[6] = framLenthArray[2];
+        b[7] = framLenthArray[3];
+
+        byte[] lenthNumberArray = intToBytes(frameNumber);
+        b[8] = lenthNumberArray[0];
+        b[9] = lenthNumberArray[1];
+        b[10] = lenthNumberArray[2];
+        b[11] = lenthNumberArray[3];
+
+        byte[] siliceNumberArray = shortToBytes(siliceNumber);
+        b[12] = siliceNumberArray[0];
+        b[13] = siliceNumberArray[1];
+
+        if (isLast) {
+            b[14] = '1';
+        } else {
+            b[14] = '0';
+        }
+        if (isKeyFrame) {
+            b[15] = '1';
+        } else {
+            b[15] = '0';
+        }
+
+    }
+
+    int number;
+
+    public void writeToSdcard(byte[] keyframe, int frameNumber, int silice) {
+        number += 1;
+        String path = "mnt/sdcard/" + frameNumber + "_" + silice + "test1.h264";
+        Log.d("writeToSdcard", "1111" );
+        File file = new File(path);
+        if (!file.exists()) {
+            file.mkdir();
+        }
+        Log.d("writeToSdcard", "2222" );
+        BufferedOutputStream outputStream1 = null;
+        try {
+            outputStream1 = new BufferedOutputStream(new FileOutputStream(file));
+            Log.d("writeToSdcard", "geiFile: " + keyframe.length);
+            outputStream1.write(keyframe, 0, keyframe.length);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (outputStream1 != null) {
+                try {
+                    outputStream1.flush();
+                    outputStream1.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
 }

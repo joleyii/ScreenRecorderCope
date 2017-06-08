@@ -5,7 +5,6 @@ public class AudioPackHeaderUtil {
 
     private AudioPackHeader initHeader(int headerCount) {
         AudioPackHeader header = new AudioPackHeader();
-
         header.type = 'U';
         header.ver = 2;
         header.codec = 0;
@@ -14,7 +13,6 @@ public class AudioPackHeaderUtil {
         header.chl = 1;
         header.bits = 16;
         header.count = headerCount;
-
         return header;
     }
 

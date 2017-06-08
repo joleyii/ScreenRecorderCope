@@ -17,6 +17,7 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Surface;
 
+import com.example.local.NetworkNative;
 import com.shine.screenrecordercope.sendtools.NetAudio;
 import com.shine.screenrecordercope.sendtools.SocketOUt;
 
@@ -28,11 +29,13 @@ import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import static android.media.MediaCodec.BUFFER_FLAG_CODEC_CONFIG;
+
 
 public class RecordService2 extends Service {
     private MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
-    private int TIMEOUT_USEC = 12000;
+    private int TIMEOUT_USEC = 100000;
     private boolean running;
     private int width = 1366;
     private int height = 768;
@@ -41,6 +44,7 @@ public class RecordService2 extends Service {
     boolean startRycicle;
     MediaCodec mediaCodec;
     SocketOUt socketOUt;
+    MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
     private NetAudio.NetAudioListener mRecoderListener = new NetAudio.NetAudioListener() {
         @Override
         public void onReciver(byte[] bytes) {
@@ -58,15 +62,21 @@ public class RecordService2 extends Service {
         return START_STICKY;
     }
 
+    NetworkNative networkNative;
+
     @Override
     public void onCreate() {
         super.onCreate();
 //        audio = new NetAudio();
 //        audio.startNet("10.0.1.87", 8000);
-        socketOUt = new SocketOUt();
-
+        networkNative = new NetworkNative();
+        networkNative.OpenSocket();
+        try {
+//            socketOUt = new SocketOUt();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         setHW();
-        createfile();
         HandlerThread serviceThread = new HandlerThread("service_thread",
                 android.os.Process.THREAD_PRIORITY_BACKGROUND);
         serviceThread.start();
@@ -92,7 +102,7 @@ public class RecordService2 extends Service {
         if (mediaProjection == null || running) {
             return false;
         }
-
+        createfile();
         createVirtualDisplay2();
         running = true;
 
@@ -101,6 +111,7 @@ public class RecordService2 extends Service {
     }
 
     public byte[] configbyte;
+    public int frameNumber = 0;
 
     private void startThread() {
         if (!isStartThread) {
@@ -111,41 +122,46 @@ public class RecordService2 extends Service {
                 public void run() {
                     Log.d("EncoderThreadEnco", "EncoderThread");
                     startRycicle = true;
+                    byte[] outDataOther;
                     while (startRycicle) {
-
                         try {
                             ByteBuffer[] outputBuffers = mediaCodec.getOutputBuffers();
                             MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
                             int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
-                            Log.d("outputBuffers.length", outputBuffers.length + "");
-                            while (outputBufferIndex >= 0) {
-                                ByteBuffer outputBuffer = outputBuffers[outputBufferIndex];
-                                Log.d("bufferInfo.size", bufferInfo.size + "");
-                                byte[] outData = new byte[bufferInfo.size];
-                                outputBuffer.get(outData);
-                                if (bufferInfo.flags == MediaCodec.BUFFER_FLAG_CODEC_CONFIG) {
-                                    configbyte = new byte[bufferInfo.size];
-                                    configbyte = outData;
-                                    ;
-                                } else if (bufferInfo.flags == MediaCodec.BUFFER_FLAG_KEY_FRAME) {
-                                    byte[] keyframe = new byte[bufferInfo.size + configbyte.length];
-                                    System.arraycopy(configbyte, 0, keyframe, 0, configbyte.length);
-                                    System.arraycopy(outData, 0, keyframe, configbyte.length, outData.length);
-                                    Log.d("keyframe.length", keyframe.length + "");
-                                    outputStream.write(keyframe, 0, keyframe.length);
-//                                    socketOUt.sendData(keyframe, keyframe.length);
+                            Log.d("outputBufferIndex", outputBufferIndex + "");
+//                            while (outputBufferIndex >= 0) {
+                            ByteBuffer outputBuffer = outputBuffers[outputBufferIndex];
+                            Log.d("bufferInfo.size", bufferInfo.size + "");
+                            byte[] outData = new byte[bufferInfo.size];
+                            outputBuffer.get(outData);
+                            if (bufferInfo.flags == BUFFER_FLAG_CODEC_CONFIG) {
+                                configbyte = new byte[bufferInfo.size];
+                                configbyte = outData;
+                            } else if (bufferInfo.flags == MediaCodec.BUFFER_FLAG_KEY_FRAME) {
+                                byte[] keyframe = new byte[bufferInfo.size + configbyte.length];
+                                System.arraycopy(configbyte, 0, keyframe, 0, configbyte.length);
+                                System.arraycopy(outData, 0, keyframe, configbyte.length, outData.length);
+                                Log.d("tttttttteeeeeee", ";;;;" + outData.length);
+//                                    outputStream.write(keyframe, 0, keyframe.length);
+//                                    socketOUt.sendData(keyframe, frameNumber, true);
+                                outDataOther = keyframe;
+                                networkNative.SendFrame(keyframe, keyframe.length, 1);
+                                frameNumber += 1;
 //                                    geiFile(keyframe);
-//                                    audio.sendAudio(keyframe);
-
-                                } else {
-                                    Log.d("outData.length", outData.length + "");
-                                    outputStream.write(outData, 0, outData.length);
-//                                    socketOUt.sendData(outData, outData.length);
+                            } else if (bufferInfo.flags == -1) {
+                                Log.d("tttttttteeeeeee", "=====" + outData.length);
+                                networkNative.SendFrame(outData, outData.length, 0);
+                            } else {
+                                Log.d("tttttttteeeeeee", "[[[[[" + outData.length);
+//                                    outputStream.write(outData, 0, outData.length);
+//                                    socketOUt.sendData(outData, frameNumber, false);
+                                networkNative.SendFrame(outData, outData.length, 0);
+                                frameNumber += 1;
 //                                    geiFile(outData);
-                                }
-//                                mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
-                                outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
                             }
+                            mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
+                            outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
+//                            }
 
                         } catch (Throwable t) {
                             t.printStackTrace();
@@ -182,14 +198,14 @@ public class RecordService2 extends Service {
             MediaFormat mediaFormat = MediaFormat.createVideoFormat("video/avc", width, height);
             mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
             mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, width * height * 5);
-            mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, 20);
-            mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
+            mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, 10);
+            mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 10);
             mediaCodec.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
             Surface surface = mediaCodec.createInputSurface();
             mediaCodec.start();
             virtualDisplay =
                     mediaProjection.createVirtualDisplay("MainScreen", width, height, dpi,
-                            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                            DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC,
                             surface,
                             null, null);
         } catch (IOException e) {
